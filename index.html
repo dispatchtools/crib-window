@@ -51,6 +51,31 @@
       font-size: 0.85rem;
       color: #666;
     }
+
+    /* Flying image animation */
+    #animContainer {
+      position: fixed;
+      top: 10px;
+      right: -200px; /* start just off the right side */
+      z-index: 9999;
+      pointer-events: none;
+    }
+    #animContainer img {
+      height: 60px;
+    }
+    .animate {
+      animation: fly-across 4s linear forwards;
+    }
+    @keyframes fly-across {
+      0% {
+        transform: translateX(0);
+        opacity: 1;
+      }
+      100% {
+        transform: translateX(-120vw); /* move across entire screen */
+        opacity: 1;
+      }
+    }
   </style>
 </head>
 <body>
@@ -76,6 +101,12 @@
 
   <div class="note">
     Crib windows end 30 minutes earlier than the original table. Page updates every 10 seconds.
+  </div>
+
+  <!-- Flying image container -->
+  <div id="animContainer">
+    <!-- If you rename the file, change the src here -->
+    <img src="Untitled design.svg" alt="crib change">
   </div>
 
   <script>
@@ -153,6 +184,29 @@
       });
     }
 
+    // Track previous state to detect changes
+    let prevInCrib = [];
+    let prevDropped = [];
+
+    function arraysChanged(a, b) {
+      if (a.length !== b.length) return true;
+      const sa = [...a].sort();
+      const sb = [...b].sort();
+      for (let i = 0; i < sa.length; i++) {
+        if (sa[i] !== sb[i]) return true;
+      }
+      return false;
+    }
+
+    function triggerAnimation() {
+      const el = document.getElementById("animContainer");
+      if (!el) return;
+      el.classList.remove("animate");
+      // force reflow so animation can restart
+      void el.offsetWidth;
+      el.classList.add("animate");
+    }
+
     function updateDisplay() {
       const now = new Date();
       const nowMins = now.getHours() * 60 + now.getMinutes();
@@ -162,7 +216,6 @@
       const dropped = [];
 
       for (const s of shifts) {
-
         // In crib window (Crib 1 OR 2)
         if (isNowInRange(s.crib1, nowMins) || isNowInRange(s.crib2, nowMins)) {
           if (!inCrib.includes(s.shift)) inCrib.push(s.shift);
@@ -193,6 +246,17 @@
       renderList("inCribList", inCrib, "No shifts currently in crib.");
       renderList("startingSoonList", startingSoon, "No crib windows starting soon.");
       renderList("droppedList", dropped, "No shifts have dropped out recently.");
+
+      // Detect change in crib status or dropped list
+      const cribChanged = arraysChanged(inCrib, prevInCrib);
+      const droppedChanged = arraysChanged(dropped, prevDropped);
+
+      if (cribChanged || droppedChanged) {
+        triggerAnimation();
+      }
+
+      prevInCrib = [...inCrib];
+      prevDropped = [...dropped];
     }
 
     updateDisplay();
