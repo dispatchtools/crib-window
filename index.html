@@ -67,10 +67,15 @@
       <h2>Crib windows starting in next 5 minutes</h2>
       <div id="startingSoonList"></div>
     </div>
+
+    <div class="card">
+      <h2>Dropped out in last 30 minutes</h2>
+      <div id="droppedList"></div>
+    </div>
   </div>
 
   <div class="note">
-    Crib windows end 30 minutes earlier than the original table.
+    Crib windows end 30 minutes earlier than the original table. Page updates every 10 seconds.
   </div>
 
   <script>
@@ -96,6 +101,7 @@
       { shift: "1915-0730", crib1: "2315-0145", crib2: "0315-0545" }
     ];
 
+    // ---- TIME HELPERS ----
     function toMinutes(hhmm) {
       const h = parseInt(hhmm.slice(0, 2), 10);
       const m = parseInt(hhmm.slice(2), 10);
@@ -103,58 +109,48 @@
     }
 
     function parseRange(rangeStr) {
-      const parts = rangeStr.split("-");
-      return { start: toMinutes(parts[0]), end: toMinutes(parts[1]) };
+      const [startStr, endStr] = rangeStr.split("-");
+      return { start: toMinutes(startStr), end: toMinutes(endStr) };
     }
 
     function isNowInRange(rangeStr, nowMins) {
       if (!rangeStr) return false;
-      const range = parseRange(rangeStr);
-      const start = range.start;
-      const end = range.end;
-
-      if (end >= start) {
-        return nowMins >= start && nowMins < end;
-      } else {
-        return nowMins >= start || nowMins < end;
-      }
+      const { start, end } = parseRange(rangeStr);
+      if (end >= start) return nowMins >= start && nowMins < end;
+      return nowMins >= start || nowMins < end;
     }
 
     function minsUntilStart(rangeStr, nowMins) {
       if (!rangeStr) return Infinity;
-      const range = parseRange(rangeStr);
-      const start = range.start;
+      const { start } = parseRange(rangeStr);
       return (start - nowMins + 1440) % 1440;
+    }
+
+    function minsSinceEnd(rangeStr, nowMins) {
+      if (!rangeStr) return Infinity;
+      const { end } = parseRange(rangeStr);
+      return (nowMins - end + 1440) % 1440;
     }
 
     function formatTimeNow() {
       const now = new Date();
-      const pad = function(n) { return n.toString().padStart(2, "0"); };
-      return (
-        pad(now.getDate()) + "/" +
-        pad(now.getMonth() + 1) + "/" +
-        now.getFullYear() + " " +
-        pad(now.getHours()) + ":" +
-        pad(now.getMinutes())
-      );
+      const pad = n => n.toString().padStart(2, "0");
+      return `${pad(now.getDate())}/${pad(now.getMonth()+1)}/${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
     }
 
-    function renderList(elementId, list, emptyMessage) {
-      const el = document.getElementById(elementId);
+    function renderList(id, list, emptyMessage) {
+      const el = document.getElementById(id);
       el.innerHTML = "";
       if (list.length === 0) {
-        const p = document.createElement("div");
-        p.className = "empty";
-        p.textContent = emptyMessage;
-        el.appendChild(p);
+        el.innerHTML = `<div class="empty">${emptyMessage}</div>`;
         return;
       }
-      for (let i = 0; i < list.length; i++) {
+      list.forEach(txt => {
         const div = document.createElement("div");
         div.className = "shift-row";
-        div.textContent = list[i];
+        div.textContent = txt;
         el.appendChild(div);
-      }
+      });
     }
 
     function updateDisplay() {
@@ -163,37 +159,44 @@
 
       const inCrib = [];
       const startingSoon = [];
+      const dropped = [];
 
-      for (let i = 0; i < shifts.length; i++) {
-        const s = shifts[i];
+      for (const s of shifts) {
 
-        // In crib window (Crib 1 OR Crib 2)
+        // In crib window (Crib 1 OR 2)
         if (isNowInRange(s.crib1, nowMins) || isNowInRange(s.crib2, nowMins)) {
-          if (inCrib.indexOf(s.shift) === -1) {
-            inCrib.push(s.shift);
-          }
+          if (!inCrib.includes(s.shift)) inCrib.push(s.shift);
         }
 
-        // Crib starting in next 5 minutes
-        const diff1 = minsUntilStart(s.crib1, nowMins);
-        if (diff1 > 0 && diff1 <= 5) {
-          startingSoon.push(s.shift + " – crib window starts at " + s.crib1);
+        // Starting in next 5 minutes
+        const d1 = minsUntilStart(s.crib1, nowMins);
+        if (d1 > 0 && d1 <= 5) startingSoon.push(`${s.shift} starts soon`);
+
+        const d2 = minsUntilStart(s.crib2, nowMins);
+        if (d2 > 0 && d2 <= 5) startingSoon.push(`${s.shift} starts soon`);
+
+        // Dropped out in last 30 mins (no crib labels)
+        const end1 = minsSinceEnd(s.crib1, nowMins);
+        if (!isNowInRange(s.crib1, nowMins) && end1 > 0 && end1 <= 30) {
+          dropped.push(`${s.shift} dropped out ${end1} min ago`);
         }
-        const diff2 = minsUntilStart(s.crib2, nowMins);
-        if (diff2 > 0 && diff2 <= 5) {
-          startingSoon.push(s.shift + " – crib window starts at " + s.crib2);
+
+        const end2 = minsSinceEnd(s.crib2, nowMins);
+        if (!isNowInRange(s.crib2, nowMins) && end2 > 0 && end2 <= 30) {
+          dropped.push(`${s.shift} dropped out ${end2} min ago`);
         }
       }
 
       document.getElementById("timeNow").textContent =
         "Current time (from this computer): " + formatTimeNow();
 
-      renderList("inCribList", inCrib, "No shifts are currently in a crib window.");
-      renderList("startingSoonList", startingSoon, "No crib windows starting in the next 5 minutes.");
+      renderList("inCribList", inCrib, "No shifts currently in crib.");
+      renderList("startingSoonList", startingSoon, "No crib windows starting soon.");
+      renderList("droppedList", dropped, "No shifts have dropped out recently.");
     }
 
     updateDisplay();
-    setInterval(updateDisplay, 10000);
+    setInterval(updateDisplay, 10000); // refresh every 10 seconds
   </script>
 </body>
 </html>
