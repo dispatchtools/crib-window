@@ -221,12 +221,12 @@
           if (!inCrib.includes(s.shift)) inCrib.push(s.shift);
         }
 
-        // Starting in next 5 minutes
+        // Starting in next 15 minutes
         const d1 = minsUntilStart(s.crib1, nowMins);
-        if (d1 > 0 && d1 <= 5) startingSoon.push(`${s.shift} starts soon`);
+        if (d1 > 0 && d1 <= 15) startingSoon.push(`${s.shift} starts soon`);
 
         const d2 = minsUntilStart(s.crib2, nowMins);
-        if (d2 > 0 && d2 <= 5) startingSoon.push(`${s.shift} starts soon`);
+        if (d2 > 0 && d2 <= 15) startingSoon.push(`${s.shift} starts soon`);
 
         // Dropped out in last 30 mins (no crib labels)
         const end1 = minsSinceEnd(s.crib1, nowMins);
